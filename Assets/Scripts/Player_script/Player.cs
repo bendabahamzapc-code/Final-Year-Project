@@ -2,61 +2,112 @@ using UnityEngine;
 
 public class Player : MonoBehaviour
 {
+    // =====================================================
+    // MOVEMENT
+    // =====================================================
+
     [Header("Movement")]
     [SerializeField] private float groundMoveSpeed = 5f;
     [SerializeField] private float airMoveSpeed = 3f;
-    [SerializeField] [Range(0f, 1f)] private float airControl = 0.7f;
+
+    [SerializeField]
+    [Range(0f, 1f)]
+    private float airControl = 0.7f;
+
+
+    // =====================================================
+    // JUMP
+    // =====================================================
 
     [Header("Jump")]
     [SerializeField] private float jumpHeight = 3f;
     [SerializeField] private float timeToJumpApex = 0.4f;
     [SerializeField] private float fallMultiplier = 2f;
 
+
     [Header("Variable Jump")]
-    [SerializeField] [Range(0.1f, 1f)]
+    [SerializeField]
+    [Range(0.1f, 1f)]
     private float shortJumpMultiplier = 0.5f;
+
 
     [Header("Jump Forgiveness")]
     [SerializeField] private float coyoteTime = 0.12f;
-    [SerializeField] private float groundCheckDisableAfterJump = 0.1f;
+
+    [SerializeField]
+    private float groundCheckDisableAfterJump = 0.1f;
+
+
+    // =====================================================
+    // GROUND CHECK
+    // =====================================================
 
     [Header("Ground Check")]
     [SerializeField] private Transform groundCheck;
     [SerializeField] private float groundCheckRadius = 0.2f;
     [SerializeField] private LayerMask groundLayer;
 
+
+    // =====================================================
+    // GRAPPLE
+    // =====================================================
+
     [Header("Grapple Settings")]
     [SerializeField] private Transform grappleOrigin;
 
-    [SerializeField] [Range(0f, 1f)]
+    [SerializeField]
+    [Range(0f, 1f)]
     private float chargingMoveMultiplier = 0.25f;
 
     [SerializeField] private float grappleLineSpeed = 25f;
     [SerializeField] private float grapplePullSpeed = 12f;
     [SerializeField] private float grappleMaxDistance = 12f;
     [SerializeField] private float grappleArrivalDistance = 0.15f;
+
     [SerializeField] private LayerMask grappleCollisionLayer;
-    [SerializeField] private string grippableTag = "aggripable";
+
+    [SerializeField]
+    private string grippableTag = "aggripable";
+
+
+    // =====================================================
+    // GRAPPLE VISUAL
+    // =====================================================
 
     [Header("Grapple Visual")]
     [SerializeField] private LineRenderer grappleLine;
 
+
     [Header("Grapple Preview")]
     [SerializeField] private LineRenderer grapplePreviewLine;
 
-    [SerializeField] private Color grapplePreviewColor =
+    [SerializeField]
+    private Color grapplePreviewColor =
         new Color(0.5f, 0.5f, 0.5f, 0.35f);
 
     [SerializeField] private float grapplePreviewWidth = 0.04f;
     [SerializeField] private float grapplePreviewLength = 12f;
 
+
+    // =====================================================
+    // REFERENCES
+    // =====================================================
+
     private Rigidbody2D rb;
+
     private PlayerHealth playerHealth;
     private PlayerSFXController playerSFX;
+    private LandingDustEffect landingDustEffect;
+
+
+    // =====================================================
+    // MOVEMENT VARIABLES
+    // =====================================================
 
     private bool isGrounded;
 
     private float moveInput;
+
     private float jumpVelocity;
     private float gravityScale;
 
@@ -65,39 +116,84 @@ public class Player : MonoBehaviour
 
     private int facingDirection = 1;
 
+    private bool horizontalMovementLocked;
+
+
+    // =====================================================
+    // LANDING
+    // =====================================================
+
+    private bool waitingForLandingSFX;
+
+
+    // =====================================================
+    // GRAPPLE STATE
+    // =====================================================
+
     private bool isChargingGrapple;
     private bool isGrapleFlying;
     private bool isBeingPulled;
     private bool isHooked;
 
     private Vector2 grappleDirection;
+
     private Vector2 currentGrappleEndPoint;
+
+    /*
+     * Position fixe utilisée comme sécurité / fallback.
+     */
     private Vector2 grappleTargetPoint;
 
-    private bool horizontalMovementLocked;
-
-    private LandingDustEffect landingDustEffect;
 
     // =====================================================
-    // LANDING SFX
+    // MOVING GRAPPLE TARGET
     // =====================================================
 
-    private bool waitingForLandingSFX;
+    /*
+     * Objet réellement attrapé par le grappin.
+     *
+     * Si cet objet bouge, le point d'accroche
+     * bougera avec lui.
+     */
+    private Transform grappleTargetTransform;
+
+    /*
+     * Position du point d'impact relativement
+     * à l'objet attrapé.
+     */
+    private Vector3 grappleTargetLocalPoint;
+
+    /*
+     * Position du Player relativement à l'objet
+     * une fois complètement accroché.
+     */
+    private Vector3 hookedLocalPosition;
+
+
+    // =====================================================
+    // UNITY
+    // =====================================================
 
     private void Awake()
     {
-        playerHealth = GetComponent<PlayerHealth>();
-        playerSFX = GetComponent<PlayerSFXController>();
         rb = GetComponent<Rigidbody2D>();
+
+        playerHealth =
+            GetComponent<PlayerHealth>();
+
+        playerSFX =
+            GetComponent<PlayerSFXController>();
+
+        landingDustEffect =
+            GetComponent<LandingDustEffect>();
 
         if (grappleLine == null)
         {
-            grappleLine = GetComponent<LineRenderer>();
+            grappleLine =
+                GetComponent<LineRenderer>();
         }
-
-        landingDustEffect =
-    GetComponent<LandingDustEffect>();
     }
+
 
     private void Start()
     {
@@ -114,17 +210,25 @@ public class Player : MonoBehaviour
             grapplePreviewLine.positionCount = 2;
             grapplePreviewLine.enabled = false;
 
-            grapplePreviewLine.startColor = grapplePreviewColor;
-            grapplePreviewLine.endColor = grapplePreviewColor;
+            grapplePreviewLine.startColor =
+                grapplePreviewColor;
 
-            grapplePreviewLine.startWidth = grapplePreviewWidth;
-            grapplePreviewLine.endWidth = grapplePreviewWidth;
+            grapplePreviewLine.endColor =
+                grapplePreviewColor;
+
+            grapplePreviewLine.startWidth =
+                grapplePreviewWidth;
+
+            grapplePreviewLine.endWidth =
+                grapplePreviewWidth;
         }
     }
 
+
     private void Update()
     {
-        moveInput = ReadHorizontalInput();
+        moveInput =
+            ReadHorizontalInput();
 
         if (moveInput > 0f)
         {
@@ -136,35 +240,20 @@ public class Player : MonoBehaviour
         }
 
         CheckGround();
+
         CheckForFalling();
+
         UpdateCoyoteTime();
 
         HandleJumpInput();
+
         HandleGrappleInput();
 
         UpdateGrappleLineVisual();
+
         UpdateGrapplePreviewLine();
     }
 
-    private void CheckForFalling()
-{
-    /*
-     * Si le joueur n'est plus au sol
-     * et descend réellement,
-     * le prochain contact avec le sol
-     * doit produire l'effet d'atterrissage.
-     */
-    if (
-        !isGrounded &&
-        rb.linearVelocity.y < -0.1f &&
-        !isHooked &&
-        !isBeingPulled &&
-        !isGrapleFlying
-    )
-    {
-        waitingForLandingSFX = true;
-    }
-}
 
     private void FixedUpdate()
     {
@@ -176,12 +265,29 @@ public class Player : MonoBehaviour
             return;
         }
 
+        // =================================================
+        // ACCROCHÉ
+        // =================================================
+
         if (isHooked)
         {
             rb.gravityScale = 0f;
             rb.linearVelocity = Vector2.zero;
+
+            /*
+             * NOUVEAU :
+             *
+             * si l'objet attrapé bouge,
+             * le joueur bouge avec lui.
+             */
+            FollowMovingGrappleTarget();
+
             return;
         }
+
+        // =================================================
+        // GRAPPIN EN VOL
+        // =================================================
 
         if (isGrapleFlying)
         {
@@ -192,6 +298,10 @@ public class Player : MonoBehaviour
 
             return;
         }
+
+        // =================================================
+        // JOUEUR TIRÉ
+        // =================================================
 
         if (isBeingPulled)
         {
@@ -204,8 +314,10 @@ public class Player : MonoBehaviour
         }
 
         Move();
+
         ApplyBetterFall();
     }
+
 
     // =====================================================
     // JUMP
@@ -243,6 +355,7 @@ public class Player : MonoBehaviour
         }
     }
 
+
     private void Jump()
     {
         coyoteTimeCounter = 0f;
@@ -259,17 +372,14 @@ public class Player : MonoBehaviour
                 jumpVelocity
             );
 
+        waitingForLandingSFX = true;
+
         if (playerSFX != null)
         {
             playerSFX.PlayJump();
         }
-
-        /*
-         * Le prochain vrai contact avec le sol
-         * déclenchera le SFX d'atterrissage.
-         */
-        waitingForLandingSFX = true;
     }
+
 
     private void CutJump()
     {
@@ -281,43 +391,55 @@ public class Player : MonoBehaviour
             );
     }
 
+
     // =====================================================
-    // LANDING
+    // LANDING / FALL
     // =====================================================
 
-    private void OnCollisionEnter2D(Collision2D collision)
+    private void CheckForFalling()
+    {
+        if (
+            !isGrounded &&
+            rb.linearVelocity.y < -0.1f &&
+            !isHooked &&
+            !isBeingPulled &&
+            !isGrapleFlying
+        )
+        {
+            waitingForLandingSFX = true;
+        }
+    }
+
+
+    private void OnCollisionEnter2D(
+        Collision2D collision
+    )
     {
         if (!waitingForLandingSFX)
         {
             return;
         }
 
-        /*
-         * Vérifie que l'objet touché se trouve
-         * bien dans une layer considérée comme Ground.
-         */
         int collisionLayer =
             1 << collision.gameObject.layer;
 
         if (
-            (groundLayer.value & collisionLayer) == 0
+            (groundLayer.value & collisionLayer)
+            == 0
         )
         {
             return;
         }
 
-        /*
-         * Vérifie que le joueur atterrit réellement
-         * SUR le sol.
-         *
-         * Cela évite de déclencher le son
-         * si le joueur touche simplement un mur.
-         */
         foreach (
             ContactPoint2D contact
             in collision.contacts
         )
         {
+            /*
+             * Le joueur doit toucher le sol
+             * par dessous ses pieds.
+             */
             if (contact.normal.y > 0.5f)
             {
                 if (playerSFX != null)
@@ -326,9 +448,9 @@ public class Player : MonoBehaviour
                 }
 
                 if (landingDustEffect != null)
-{
-    landingDustEffect.Play();
-}
+                {
+                    landingDustEffect.Play();
+                }
 
                 waitingForLandingSFX = false;
 
@@ -337,8 +459,9 @@ public class Player : MonoBehaviour
         }
     }
 
+
     // =====================================================
-    // ATTACK MOVEMENT LOCK
+    // HORIZONTAL MOVEMENT LOCK
     // =====================================================
 
     public void LockHorizontalMovement(bool locked)
@@ -355,28 +478,63 @@ public class Player : MonoBehaviour
         }
     }
 
+
     // =====================================================
     // GRAPPLE INPUT
     // =====================================================
 
-private void HandleGrappleInput()
-{
-    /*
-     * Si le jeu est en pause ou sur l'écran de mort,
-     * aucun nouvel input de grappin n'est accepté.
-     *
-     * PauseMenu et PlayerHealth utilisent tous les deux
-     * Time.timeScale = 0f.
-     */
-    if (Time.timeScale == 0f)
+    private void HandleGrappleInput()
     {
         /*
-         * Si le joueur était en train de charger au moment
-         * où le jeu a été mis en pause, on annule la charge
-         * et son SFX.
+         * Empêche de charger ou tirer le grappin
+         * pendant Pause / Game Over.
          */
-        if (isChargingGrapple)
+        if (Time.timeScale == 0f)
         {
+            if (isChargingGrapple)
+            {
+                isChargingGrapple = false;
+
+                if (playerSFX != null)
+                {
+                    playerSFX.StopGrappleCharge();
+                }
+
+                if (grapplePreviewLine != null)
+                {
+                    grapplePreviewLine.enabled = false;
+                }
+            }
+
+            return;
+        }
+
+        if (GrapplePressedThisFrame())
+        {
+            if (
+                isHooked ||
+                isBeingPulled ||
+                isGrapleFlying
+            )
+            {
+                return;
+            }
+
+            isChargingGrapple = true;
+
+            if (playerSFX != null)
+            {
+                playerSFX.StartGrappleCharge();
+            }
+        }
+
+        if (GrappleReleasedThisFrame())
+        {
+            if (!isChargingGrapple)
+            {
+                return;
+            }
+
             isChargingGrapple = false;
 
             if (playerSFX != null)
@@ -384,69 +542,36 @@ private void HandleGrappleInput()
                 playerSFX.StopGrappleCharge();
             }
 
-            if (grapplePreviewLine != null)
-            {
-                grapplePreviewLine.enabled = false;
-            }
-        }
-
-        return;
-    }
-
-    if (GrapplePressedThisFrame())
-    {
-        if (
-            isHooked ||
-            isBeingPulled ||
-            isGrapleFlying
-        )
-        {
-            return;
-        }
-
-        isChargingGrapple = true;
-
-        if (playerSFX != null)
-        {
-            playerSFX.StartGrappleCharge();
+            FireGrapple();
         }
     }
 
-    if (GrappleReleasedThisFrame())
-    {
-        if (!isChargingGrapple)
-        {
-            return;
-        }
-
-        isChargingGrapple = false;
-
-        if (playerSFX != null)
-        {
-            playerSFX.StopGrappleCharge();
-        }
-
-        FireGrapple();
-    }
-}
 
     // =====================================================
-    // GRAPPLE FIRE
+    // FIRE GRAPPLE
     // =====================================================
 
     private void FireGrapple()
     {
+        if (Time.timeScale == 0f)
+        {
+            return;
+        }
 
-            if (Time.timeScale == 0f)
-    {
-        return;
-    }
-    
+        /*
+         * On oublie l'ancien objet attrapé.
+         */
+        grappleTargetTransform = null;
+
         if (grapplePreviewLine != null)
         {
             grapplePreviewLine.enabled = false;
         }
 
+        /*
+         * Le grappin part actuellement uniquement
+         * à gauche ou à droite.
+         */
         grappleDirection =
             new Vector2(
                 facingDirection,
@@ -463,6 +588,11 @@ private void HandleGrappleInput()
         rb.gravityScale = 0f;
         rb.linearVelocity = Vector2.zero;
 
+        if (playerSFX != null)
+        {
+            playerSFX.StartGrappleShot();
+        }
+
         if (grappleLine != null)
         {
             grappleLine.enabled = true;
@@ -477,12 +607,12 @@ private void HandleGrappleInput()
                 currentGrappleEndPoint
             );
         }
-
-        if (playerSFX != null)
-        {
-            playerSFX.StartGrappleShot();
-        }
     }
+
+
+    // =====================================================
+    // GRAPPLE FLYING
+    // =====================================================
 
     private void MoveGrappleLine()
     {
@@ -514,14 +644,42 @@ private void HandleGrappleInput()
             currentGrappleEndPoint =
                 hit.point;
 
+            // =============================================
+            // OBJET AGRIPPABLE
+            // =============================================
+
             if (
                 hit.collider.CompareTag(
                     grippableTag
                 )
             )
             {
+                /*
+                 * Position d'origine dans le monde.
+                 */
                 grappleTargetPoint =
                     hit.point;
+
+                /*
+                 * NOUVEAU :
+                 *
+                 * On mémorise quel objet a été touché.
+                 */
+                grappleTargetTransform =
+                    hit.collider.transform;
+
+                /*
+                 * On transforme le point d'impact
+                 * en coordonnées locales de l'objet.
+                 *
+                 * Ainsi, si l'objet bouge,
+                 * ce point bouge avec lui.
+                 */
+                grappleTargetLocalPoint =
+                    grappleTargetTransform
+                    .InverseTransformPoint(
+                        hit.point
+                    );
 
                 if (playerSFX != null)
                 {
@@ -531,6 +689,11 @@ private void HandleGrappleInput()
 
                 StartPullingPlayer();
             }
+
+            // =============================================
+            // OBJET NON AGRIPPABLE
+            // =============================================
+
             else
             {
                 if (playerSFX != null)
@@ -563,8 +726,35 @@ private void HandleGrappleInput()
         }
     }
 
+
     // =====================================================
-    // GRAPPLE PULL
+    // CURRENT GRAPPLE TARGET
+    // =====================================================
+
+    private Vector2 GetCurrentGrappleTargetPosition()
+    {
+        /*
+         * Si l'objet existe encore,
+         * on récupère le point local converti
+         * vers sa nouvelle position dans le monde.
+         */
+        if (grappleTargetTransform != null)
+        {
+            return
+                grappleTargetTransform.TransformPoint(
+                    grappleTargetLocalPoint
+                );
+        }
+
+        /*
+         * Sécurité pour un point statique.
+         */
+        return grappleTargetPoint;
+    }
+
+
+    // =====================================================
+    // START PULL
     // =====================================================
 
     private void StartPullingPlayer()
@@ -582,15 +772,23 @@ private void HandleGrappleInput()
         }
     }
 
+
+    // =====================================================
+    // PULL PLAYER
+    // =====================================================
+
     private void PullPlayerToGrapplePoint()
     {
+        Vector2 targetPosition =
+            GetCurrentGrappleTargetPosition();
+
         Vector2 currentPosition =
             rb.position;
 
         Vector2 newPosition =
             Vector2.MoveTowards(
                 currentPosition,
-                grappleTargetPoint,
+                targetPosition,
                 grapplePullSpeed *
                 Time.fixedDeltaTime
             );
@@ -600,7 +798,7 @@ private void HandleGrappleInput()
         float distanceToTarget =
             Vector2.Distance(
                 newPosition,
-                grappleTargetPoint
+                targetPosition
             );
 
         if (
@@ -608,8 +806,16 @@ private void HandleGrappleInput()
             grappleArrivalDistance
         )
         {
+            /*
+             * On récupère encore une fois
+             * la position car la plateforme
+             * a pu bouger pendant le trajet.
+             */
+            targetPosition =
+                GetCurrentGrappleTargetPosition();
+
             rb.position =
-                grappleTargetPoint;
+                targetPosition;
 
             rb.linearVelocity =
                 Vector2.zero;
@@ -620,20 +826,79 @@ private void HandleGrappleInput()
             isGrapleFlying = false;
             isHooked = true;
 
-            if (grappleLine != null)
-            {
-                grappleLine.enabled = false;
-            }
-
             if (playerSFX != null)
             {
                 playerSFX.StopGrappleMovement();
             }
+
+            /*
+             * NOUVEAU :
+             *
+             * Une fois accroché,
+             * on mémorise la position du joueur
+             * relativement à l'objet.
+             */
+            if (grappleTargetTransform != null)
+            {
+                hookedLocalPosition =
+                    grappleTargetTransform
+                    .InverseTransformPoint(
+                        rb.position
+                    );
+            }
+
+            if (grappleLine != null)
+            {
+                grappleLine.enabled = false;
+            }
         }
     }
 
+
     // =====================================================
-    // GRAPPLE EXIT
+    // FOLLOW MOVING GRAPPLE TARGET
+    // =====================================================
+
+    private void FollowMovingGrappleTarget()
+    {
+        if (!isHooked)
+        {
+            return;
+        }
+
+        /*
+         * Objet détruit ou inexistant :
+         * on reste simplement accroché
+         * au dernier point connu.
+         */
+        if (grappleTargetTransform == null)
+        {
+            return;
+        }
+
+        /*
+         * Convertit la position locale mémorisée
+         * vers la position actuelle dans le monde.
+         *
+         * Donc si la plateforme se déplace,
+         * le joueur se déplace avec elle.
+         */
+        Vector2 newPlayerPosition =
+            grappleTargetTransform.TransformPoint(
+                hookedLocalPosition
+            );
+
+        rb.MovePosition(
+            newPlayerPosition
+        );
+
+        rb.linearVelocity =
+            Vector2.zero;
+    }
+
+
+    // =====================================================
+    // EXIT GRAPPLE + JUMP
     // =====================================================
 
     private void ForceExitGrappleAndJump()
@@ -642,6 +907,12 @@ private void HandleGrappleInput()
         isBeingPulled = false;
         isGrapleFlying = false;
         isChargingGrapple = false;
+
+        /*
+         * Le joueur n'est plus attaché
+         * à l'objet mobile.
+         */
+        grappleTargetTransform = null;
 
         coyoteTimeCounter = 0f;
 
@@ -659,12 +930,6 @@ private void HandleGrappleInput()
             grappleLine.enabled = false;
         }
 
-        rb.linearVelocity =
-            new Vector2(
-                rb.linearVelocity.x,
-                jumpVelocity
-            );
-
         if (grapplePreviewLine != null)
         {
             grapplePreviewLine.enabled = false;
@@ -676,12 +941,19 @@ private void HandleGrappleInput()
             playerSFX.PlayJump();
         }
 
-        /*
-         * Le saut après grappin déclenche
-         * également un SFX lorsqu'il retombe.
-         */
         waitingForLandingSFX = true;
+
+        rb.linearVelocity =
+            new Vector2(
+                rb.linearVelocity.x,
+                jumpVelocity
+            );
     }
+
+
+    // =====================================================
+    // CANCEL GRAPPLE
+    // =====================================================
 
     private void CancelGrapple()
     {
@@ -689,6 +961,12 @@ private void HandleGrappleInput()
         isBeingPulled = false;
         isHooked = false;
         isChargingGrapple = false;
+
+        /*
+         * On enlève toute référence
+         * vers l'ancien objet attrapé.
+         */
+        grappleTargetTransform = null;
 
         rb.gravityScale =
             gravityScale;
@@ -709,8 +987,9 @@ private void HandleGrappleInput()
         }
     }
 
+
     // =====================================================
-    // GRAPPLE VISUAL
+    // GRAPPLE LINE VISUAL
     // =====================================================
 
     private void UpdateGrappleLineVisual()
@@ -734,8 +1013,13 @@ private void HandleGrappleInput()
             isHooked
         )
         {
+            /*
+             * NOUVEAU :
+             * la ligne suit elle aussi
+             * l'objet mobile.
+             */
             endPoint =
-                grappleTargetPoint;
+                GetCurrentGrappleTargetPosition();
         }
         else
         {
@@ -753,6 +1037,11 @@ private void HandleGrappleInput()
             endPoint
         );
     }
+
+
+    // =====================================================
+    // GRAPPLE PREVIEW
+    // =====================================================
 
     private void UpdateGrapplePreviewLine()
     {
@@ -815,8 +1104,9 @@ private void HandleGrappleInput()
         );
     }
 
+
     // =====================================================
-    // MOVEMENT
+    // NORMAL MOVEMENT
     // =====================================================
 
     private void Move()
@@ -861,8 +1151,9 @@ private void HandleGrappleInput()
             );
     }
 
+
     // =====================================================
-    // GRAVITY
+    // FALL
     // =====================================================
 
     private void ApplyBetterFall()
@@ -880,6 +1171,7 @@ private void HandleGrappleInput()
         }
     }
 
+
     // =====================================================
     // GROUND
     // =====================================================
@@ -894,6 +1186,12 @@ private void HandleGrappleInput()
             return;
         }
 
+        if (groundCheck == null)
+        {
+            isGrounded = false;
+            return;
+        }
+
         isGrounded =
             Physics2D.OverlapCircle(
                 groundCheck.position,
@@ -901,6 +1199,7 @@ private void HandleGrappleInput()
                 groundLayer
             );
     }
+
 
     private void UpdateCoyoteTime()
     {
@@ -928,6 +1227,11 @@ private void HandleGrappleInput()
         }
     }
 
+
+    // =====================================================
+    // JUMP VALUES
+    // =====================================================
+
     private void CalculateJumpValues()
     {
         float gravity =
@@ -951,8 +1255,9 @@ private void HandleGrappleInput()
             gravityScale;
     }
 
+
     // =====================================================
-    // NEW INPUT SYSTEM
+    // INPUT SYSTEM
     // =====================================================
 
     private float ReadHorizontalInput()
@@ -962,8 +1267,10 @@ private void HandleGrappleInput()
             return 0f;
         }
 
-        return GameInput.Instance.MoveHorizontal;
+        return
+            GameInput.Instance.MoveHorizontal;
     }
+
 
     private bool JumpPressedThisFrame()
     {
@@ -972,8 +1279,10 @@ private void HandleGrappleInput()
             return false;
         }
 
-        return GameInput.Instance.JumpPressedThisFrame;
+        return
+            GameInput.Instance.JumpPressedThisFrame;
     }
+
 
     private bool JumpReleasedThisFrame()
     {
@@ -982,8 +1291,10 @@ private void HandleGrappleInput()
             return false;
         }
 
-        return GameInput.Instance.JumpReleasedThisFrame;
+        return
+            GameInput.Instance.JumpReleasedThisFrame;
     }
+
 
     private bool GrapplePressedThisFrame()
     {
@@ -992,8 +1303,10 @@ private void HandleGrappleInput()
             return false;
         }
 
-        return GameInput.Instance.GrapplePressedThisFrame;
+        return
+            GameInput.Instance.GrapplePressedThisFrame;
     }
+
 
     private bool GrappleReleasedThisFrame()
     {
@@ -1002,8 +1315,20 @@ private void HandleGrappleInput()
             return false;
         }
 
-        return GameInput.Instance.GrappleReleasedThisFrame;
+        return
+            GameInput.Instance.GrappleReleasedThisFrame;
     }
+
+
+    // =====================================================
+    // PUBLIC
+    // =====================================================
+
+    public bool IsGrounded()
+    {
+        return isGrounded;
+    }
+
 
     // =====================================================
     // VALIDATION
@@ -1026,15 +1351,12 @@ private void HandleGrappleInput()
             fallMultiplier = 1f;
         }
 
-        if (shortJumpMultiplier < 0.1f)
-        {
-            shortJumpMultiplier = 0.1f;
-        }
-
-        if (shortJumpMultiplier > 1f)
-        {
-            shortJumpMultiplier = 1f;
-        }
+        shortJumpMultiplier =
+            Mathf.Clamp(
+                shortJumpMultiplier,
+                0.1f,
+                1f
+            );
 
         if (coyoteTime < 0f)
         {
@@ -1048,15 +1370,10 @@ private void HandleGrappleInput()
             groundCheckDisableAfterJump = 0f;
         }
 
-        if (chargingMoveMultiplier < 0f)
-        {
-            chargingMoveMultiplier = 0f;
-        }
-
-        if (chargingMoveMultiplier > 1f)
-        {
-            chargingMoveMultiplier = 1f;
-        }
+        chargingMoveMultiplier =
+            Mathf.Clamp01(
+                chargingMoveMultiplier
+            );
 
         if (grappleLineSpeed <= 0f)
         {
@@ -1081,6 +1398,11 @@ private void HandleGrappleInput()
         }
     }
 
+
+    // =====================================================
+    // GIZMOS
+    // =====================================================
+
     private void OnDrawGizmosSelected()
     {
         if (groundCheck != null)
@@ -1098,10 +1420,5 @@ private void HandleGrappleInput()
                 0.1f
             );
         }
-    }
-
-    public bool IsGrounded()
-    {
-        return isGrounded;
     }
 }
